@@ -1,0 +1,1405 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AquaSentinel - Advanced Marine Pollution Detection & Dispersion Model</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- FontAwesome for crisp oceanic & technical icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Google Fonts: Inter & JetBrains Mono -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+    <!-- Chart.js for Backscatter Signature Analytics -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        ocean: {
+                            950: '#030816',
+                            900: '#071126',
+                            800: '#0b1d3a',
+                            700: '#102a52',
+                            600: '#173b70',
+                        },
+                        cyanNeon: '#00f0ff',
+                        emeraldNeon: '#00ff9d',
+                        amberNeon: '#ffb700',
+                        crimsonNeon: '#ff0055',
+                    },
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                        mono: ['JetBrains Mono', 'monospace'],
+                    },
+                    boxShadow: {
+                        'neon-glow': '0 0 20px rgba(0, 240, 255, 0.25)',
+                        'emerald-glow': '0 0 20px rgba(0, 255, 157, 0.25)',
+                        'crimson-glow': '0 0 20px rgba(255, 0, 85, 0.3)',
+                    }
+                }
+            }
+        }
+    </script>
+
+    <style>
+        body {
+            background-color: #030816;
+            color: #e2e8f0;
+            font-family: 'Inter', sans-serif;
+            overflow-x: hidden;
+        }
+
+        /* Glassmorphism utility */
+        .glass-panel {
+            background: rgba(11, 29, 58, 0.65);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border: 1px solid rgba(0, 240, 255, 0.12);
+        }
+
+        .glass-card {
+            background: rgba(7, 17, 38, 0.75);
+            backdrop-filter: blur(8px);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+        }
+
+        /* Custom Scrollbar */
+        ::-webkit-scrollbar {
+            width: 6px;
+            height: 6px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #030816;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #102a52;
+            border-radius: 4px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #00f0ff;
+        }
+
+        /* Radar scan line animation */
+        @keyframes radar-sweep {
+            0% { transform: translateY(-100%); }
+            100% { transform: translateY(100%); }
+        }
+
+        .radar-scanner::after {
+            content: '';
+            position: absolute;
+            top: 0; left: 0; right: 0; height: 12px;
+            background: linear-gradient(180deg, rgba(0, 240, 255, 0.8) 0%, rgba(0, 240, 255, 0) 100%);
+            box-shadow: 0 4px 15px rgba(0, 240, 255, 0.8);
+            animation: radar-sweep 2.5s infinite linear;
+            pointer-events: none;
+        }
+
+        /* Compass Rose Styling */
+        .compass-dial {
+            background: radial-gradient(circle, rgba(16,42,82,0.8) 0%, rgba(7,17,38,1) 100%);
+            border: 2px solid rgba(0, 240, 255, 0.3);
+        }
+
+        /* Dynamic Range Slider */
+        input[type=range] {
+            accent-color: #00f0ff;
+        }
+    </style>
+</head>
+<body class="min-h-screen flex flex-col justify-between selection:bg-cyanNeon selection:text-ocean-950">
+
+    <!-- TOP HEADER / NAV BAR -->
+    <header class="sticky top-0 z-50 glass-panel border-b border-cyanNeon/20 px-4 lg:px-8 py-3">
+        <div class="max-w-7xl mx-auto flex flex-col md:flex-row items-center justify-between gap-4">
+            
+            <!-- Brand Logo & Status -->
+            <div class="flex items-center gap-3">
+                <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-cyanNeon to-blue-600 flex items-center justify-center shadow-neon-glow">
+                    <i class="fa-solid font-bold fa-satellite text-ocean-950 text-xl"></i>
+                </div>
+                <div>
+                    <div class="flex items-center gap-2">
+                        <span class="font-bold text-lg tracking-wider text-white">AQUA<span class="text-cyanNeon">SENTINEL</span></span>
+                        <span class="text-xs px-2 py-0.5 rounded-full bg-cyanNeon/10 text-cyanNeon border border-cyanNeon/30 font-mono">SAR v3.4</span>
+                    </div>
+                    <p class="text-xs text-slate-400">Satellite SAR Marine Debris & Spill Intelligence Platform</p>
+                </div>
+            </div>
+
+            <!-- Navigation Tabs -->
+            <nav class="flex items-center gap-1 bg-ocean-900/80 p-1 rounded-xl border border-white/10 text-xs font-medium">
+                <button onclick="switchTab('detector')" id="tab-detector" class="px-4 py-2 rounded-lg transition-all flex items-center gap-2 text-cyanNeon bg-ocean-700/60 shadow-sm">
+                    <i class="fa-solid fa-microscope"></i>
+                    <span>SAR Detector</span>
+                </button>
+                <button onclick="switchTab('forecast')" id="tab-forecast" class="px-4 py-2 rounded-lg transition-all flex items-center gap-2 text-slate-400 hover:text-white">
+                    <i class="fa-solid fa-wind"></i>
+                    <span>Dispersion Model</span>
+                </button>
+                <button onclick="switchTab('analytics')" id="tab-analytics" class="px-4 py-2 rounded-lg transition-all flex items-center gap-2 text-slate-400 hover:text-white">
+                    <i class="fa-solid fa-chart-line"></i>
+                    <span>Analytics & Metrics</span>
+                </button>
+            </nav>
+
+            <!-- Global Status & Action -->
+            <div class="hidden sm:flex items-center gap-4">
+                <div class="flex items-center gap-2 text-xs text-slate-300 bg-ocean-900/50 px-3 py-1.5 rounded-lg border border-white/5">
+                    <span class="w-2 h-2 rounded-full bg-emeraldNeon animate-pulse"></span>
+                    <span class="font-mono text-slate-400">Sentinel-1 Data Feed:</span>
+                    <span class="text-emeraldNeon font-semibold">ONLINE</span>
+                </div>
+                <button onclick="openEmergencyModal()" class="px-3.5 py-1.5 text-xs font-semibold rounded-lg bg-crimsonNeon/20 text-crimsonNeon border border-crimsonNeon/40 hover:bg-crimsonNeon hover:text-white transition-all flex items-center gap-2">
+                    <i class="fa-solid fa-triangle-exclamation"></i>
+                    <span>Issue Alert</span>
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <!-- MAIN CONTENT WRAPPER -->
+    <main class="max-w-7xl mx-auto w-full px-4 lg:px-8 py-6 flex-grow space-y-6">
+
+        <!-- PRESET SELECTOR BAR -->
+        <section class="glass-panel rounded-2xl p-4 flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+            <div class="flex items-center gap-3">
+                <i class="fa-solid fa-floppy-disk text-cyanNeon"></i>
+                <div>
+                    <h3 class="text-sm font-semibold text-white">Pre-loaded Synthetic Aperture Radar Presets</h3>
+                    <p class="text-xs text-slate-400">Select standard benchmark satellite captures for instant analysis</p>
+                </div>
+            </div>
+            <div class="flex flex-wrap items-center gap-2 w-full md:w-auto">
+                <button onclick="loadPreset('gulf_oil')" class="preset-btn text-xs px-3 py-2 rounded-lg bg-ocean-800 hover:bg-ocean-700 border border-cyanNeon/30 text-slate-200 hover:text-cyanNeon transition flex items-center gap-2">
+                    <i class="fa-solid fa-oil-well text-amberNeon"></i>
+                    <span>Gulf Oil Spill (Sentinel-1)</span>
+                </button>
+                <button onclick="loadPreset('pacific_debris')" class="preset-btn text-xs px-3 py-2 rounded-lg bg-ocean-800 hover:bg-ocean-700 border border-cyanNeon/30 text-slate-200 hover:text-cyanNeon transition flex items-center gap-2">
+                    <i class="fa-solid fa-bottle-water text-cyanNeon"></i>
+                    <span>Pacific Macro-Plastics</span>
+                </button>
+                <button onclick="loadPreset('clean_coastal')" class="preset-btn text-xs px-3 py-2 rounded-lg bg-ocean-800 hover:bg-ocean-700 border border-cyanNeon/30 text-slate-200 hover:text-cyanNeon transition flex items-center gap-2">
+                    <i class="fa-solid fa-water text-emeraldNeon"></i>
+                    <span>Clean Coastal Slick (Look-alike)</span>
+                </button>
+            </div>
+        </section>
+
+        <!-- TAB 1: DETECTOR & DUAL IMAGE PROCESSING -->
+        <div id="view-detector" class="tab-content space-y-6">
+            <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+                
+                <!-- INPUT & PRE-PROCESSING CONTROLS (5 cols) -->
+                <div class="lg:col-span-5 space-y-6">
+                    
+                    <!-- SAR Image Upload Dropzone -->
+                    <div class="glass-panel p-5 rounded-2xl space-y-4">
+                        <div class="flex justify-between items-center">
+                            <h2 class="text-sm font-bold text-white flex items-center gap-2">
+                                <i class="fa-solid fa-satellite-dish text-cyanNeon"></i>
+                                1. SAR Sensor Image (VV/VH)
+                            </h2>
+                            <span id="sar-sensor-tag" class="text-[10px] font-mono px-2 py-0.5 rounded bg-cyanNeon/10 text-cyanNeon border border-cyanNeon/20">Sentinel-1 C-Band</span>
+                        </div>
+
+                        <div id="sar-dropzone" onclick="document.getElementById('sar-file-input').click()" class="border-2 border-dashed border-slate-700 hover:border-cyanNeon/60 rounded-xl p-4 text-center cursor-pointer transition-all bg-ocean-900/40 relative group">
+                            <input type="file" id="sar-file-input" class="hidden" accept="image/*" onchange="handleFileUpload(event, 'sar')">
+                            <div class="space-y-2 pointer-events-none">
+                                <div class="w-12 h-12 rounded-full bg-ocean-800 text-cyanNeon flex items-center justify-center mx-auto group-hover:scale-110 transition-transform">
+                                    <i class="fa-solid fa-cloud-arrow-up text-lg"></i>
+                                </div>
+                                <div class="text-xs text-slate-300 font-medium">Drag & Drop SAR Image or <span class="text-cyanNeon underline">Browse</span></div>
+                                <p class="text-[10px] text-slate-500">Supports PNG, JPG, WEBP, GeoTIFF</p>
+                            </div>
+                        </div>
+
+                        <!-- Image Specs Box -->
+                        <div class="grid grid-cols-2 gap-2 text-[11px] font-mono bg-ocean-900/80 p-2.5 rounded-lg border border-white/5">
+                            <div><span class="text-slate-500">Resolution:</span> <span id="spec-res" class="text-slate-200">10m / px</span></div>
+                            <div><span class="text-slate-500">Mode:</span> <span id="spec-mode" class="text-slate-200">IW (Interferometric)</span></div>
+                            <div><span class="text-slate-500">Incidence Angle:</span> <span id="spec-inc" class="text-slate-200">34.2°</span></div>
+                            <div><span class="text-slate-500">Swath Area:</span> <span id="spec-swath" class="text-slate-200">250 km</span></div>
+                        </div>
+                    </div>
+
+                    <!-- Mask Overlay Upload Dropzone -->
+                    <div class="glass-panel p-5 rounded-2xl space-y-4">
+                        <div class="flex justify-between items-center">
+                            <h2 class="text-sm font-bold text-white flex items-center gap-2">
+                                <i class="fa-solid fa-layer-group text-emeraldNeon"></i>
+                                2. Binary / Segmentation Mask
+                            </h2>
+                            <label class="flex items-center gap-2 cursor-pointer">
+                                <span class="text-xs text-slate-400">Overlay</span>
+                                <input type="checkbox" id="toggle-mask-overlay" checked onchange="renderCanvasLayers()" class="sr-only peer">
+                                <div class="w-8 h-4 bg-ocean-900 rounded-full peer peer-checked:bg-cyanNeon peer-checked:after:translate-x-full after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-ocean-950 after:border-slate-300 after:border after:rounded-full after:h-3 after:w-3 after:transition-all relative"></div>
+                            </label>
+                        </div>
+
+                        <div id="mask-dropzone" onclick="document.getElementById('mask-file-input').click()" class="border-2 border-dashed border-slate-700 hover:border-emeraldNeon/60 rounded-xl p-4 text-center cursor-pointer transition-all bg-ocean-900/40 relative group">
+                            <input type="file" id="mask-file-input" class="hidden" accept="image/*" onchange="handleFileUpload(event, 'mask')">
+                            <div class="space-y-2 pointer-events-none">
+                                <div class="w-10 h-10 rounded-full bg-ocean-800 text-emeraldNeon flex items-center justify-center mx-auto group-hover:scale-110 transition-transform">
+                                    <i class="fa-solid fa-file-image text-md"></i>
+                                </div>
+                                <div class="text-xs text-slate-300 font-medium">Upload Segmentation Mask (Optional)</div>
+                                <p class="text-[10px] text-slate-500">Auto-generated via Deep Learning if left empty</p>
+                            </div>
+                        </div>
+
+                        <!-- Pre-processing Toggles -->
+                        <div class="space-y-3 pt-2 border-t border-white/5">
+                            <h4 class="text-xs font-semibold text-slate-300">SAR Image Pre-processing Filter</h4>
+                            <div class="grid grid-cols-2 gap-2">
+                                <label class="flex items-center gap-2 text-xs text-slate-400 cursor-pointer">
+                                    <input type="checkbox" id="filter-speckle" checked onchange="applyFiltersAndRender()" class="accent-cyanNeon">
+                                    <span>Lee Speckle Filter</span>
+                                </label>
+                                <label class="flex items-center gap-2 text-xs text-slate-400 cursor-pointer">
+                                    <input type="checkbox" id="filter-contrast" checked onchange="applyFiltersAndRender()" class="accent-cyanNeon">
+                                    <span>Backscatter Contrast</span>
+                                </label>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- RUN ANALYSIS BUTTON -->
+                    <button onclick="runAIAnalysis()" id="btn-analyze" class="w-full py-4 rounded-xl bg-gradient-to-r from-cyanNeon via-blue-600 to-emeraldNeon text-ocean-950 font-bold text-sm tracking-wider uppercase shadow-neon-glow hover:opacity-95 active:scale-[0.99] transition flex items-center justify-center gap-3">
+                        <i class="fa-solid fa-wand-magic-sparkles text-lg"></i>
+                        <span>Analyze Marine Debris & Spills</span>
+                    </button>
+                </div>
+
+                <!-- DUAL CANVAS & AI SCAN DISPLAY (7 cols) -->
+                <div class="lg:col-span-7 space-y-6">
+                    <div class="glass-panel p-5 rounded-2xl space-y-4">
+                        <div class="flex flex-wrap items-center justify-between gap-2 border-b border-white/5 pb-3">
+                            <div class="flex items-center gap-3">
+                                <h3 class="text-sm font-bold text-white">SAR Analysis Viewport</h3>
+                                <span id="processing-badge" class="hidden text-xs px-2 py-0.5 rounded bg-amberNeon/20 text-amberNeon border border-amberNeon/40 font-mono animate-pulse">Processing Neural Network...</span>
+                            </div>
+                            <div class="flex items-center gap-2 text-xs">
+                                <button onclick="setMapDisplayMode('sar')" id="mode-sar" class="px-2.5 py-1 rounded bg-cyanNeon/20 text-cyanNeon border border-cyanNeon/30 font-mono">SAR Raw</button>
+                                <button onclick="setMapDisplayMode('mask')" id="mode-mask" class="px-2.5 py-1 rounded bg-ocean-800 text-slate-400 font-mono">Mask Overlay</button>
+                                <button onclick="setMapDisplayMode('heatmap')" id="mode-heat" class="px-2.5 py-1 rounded bg-ocean-800 text-slate-400 font-mono">Confidence Heatmap</button>
+                            </div>
+                        </div>
+
+                        <!-- Canvas Display Area -->
+                        <div class="relative rounded-xl overflow-hidden bg-ocean-950 border border-slate-800 h-[380px] flex items-center justify-center group" id="canvas-container">
+                            <!-- Scanning Animation Overlay -->
+                            <div id="radar-scanner" class="hidden absolute inset-0 radar-scanner z-20"></div>
+
+                            <canvas id="sar-canvas" class="max-w-full max-h-full object-contain"></canvas>
+
+                            <!-- Pixel Value Inspector Hover Box -->
+                            <div id="pixel-inspector" class="absolute bottom-3 left-3 z-30 glass-card px-3 py-1.5 rounded-lg text-[10px] font-mono text-cyanNeon border border-cyanNeon/30 hidden">
+                                Coord: <span id="inspect-coord">X:0, Y:0</span> | Backscatter ($\sigma^0$): <span id="inspect-val">-18.4 dB</span>
+                            </div>
+
+                            <!-- Floating Legend -->
+                            <div class="absolute top-3 right-3 z-30 glass-card px-3 py-2 rounded-lg text-[10px] space-y-1 border border-white/10">
+                                <div class="flex items-center gap-2">
+                                    <span class="w-3 h-3 rounded bg-red-500/80 border border-red-400"></span>
+                                    <span class="text-slate-300">Dark Patch (Oil Slick)</span>
+                                </div>
+                                <div class="flex items-center gap-2">
+                                    <span class="w-3 h-3 rounded bg-amber-400/80 border border-amber-300"></span>
+                                    <span class="text-slate-300">Rough Anomaly (Debris)</span>
+                                </div>
+                                <div class="flex items-center gap-2">
+                                    <span class="w-3 h-3 rounded bg-blue-500/40 border border-blue-400"></span>
+                                    <span class="text-slate-300">Ambient Ocean Water</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Mask Opacity Slider -->
+                        <div class="flex items-center gap-4 text-xs">
+                            <span class="text-slate-400">Mask Layer Opacity:</span>
+                            <input type="range" id="mask-opacity" min="0" max="1" step="0.05" value="0.65" oninput="renderCanvasLayers()" class="flex-grow">
+                            <span id="opacity-val" class="font-mono text-cyanNeon w-8">65%</span>
+                        </div>
+                    </div>
+
+                    <!-- AI DETECTION RESULTS CARD -->
+                    <div class="glass-panel p-5 rounded-2xl space-y-4">
+                        <h3 class="text-sm font-bold text-white flex items-center justify-between">
+                            <span class="flex items-center gap-2">
+                                <i class="fa-solid fa-brain text-cyanNeon"></i>
+                                Neural Network Detection & Classification Output
+                            </span>
+                            <span class="text-xs text-slate-400 font-mono">Model: DeepMarineNet-v4</span>
+                        </h3>
+
+                        <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                            <!-- Classification Badge -->
+                            <div class="glass-card p-4 rounded-xl border-l-4 border-l-crimsonNeon flex flex-col justify-between">
+                                <span class="text-xs text-slate-400">Detected Feature</span>
+                                <div>
+                                    <div id="res-classification" class="text-lg font-bold text-crimsonNeon">Oil Spill</div>
+                                    <span id="res-subtype" class="text-[10px] text-slate-400">Heavy Crude / Crude Slick</span>
+                                </div>
+                            </div>
+
+                            <!-- Confidence Meter -->
+                            <div class="glass-card p-4 rounded-xl border-l-4 border-l-cyanNeon flex flex-col justify-between">
+                                <span class="text-xs text-slate-400">Detection Confidence</span>
+                                <div class="space-y-1">
+                                    <div class="flex justify-between items-baseline">
+                                        <span id="res-confidence" class="text-xl font-bold font-mono text-cyanNeon">94.2%</span>
+                                        <span class="text-[10px] text-emeraldNeon">High Precision</span>
+                                    </div>
+                                    <div class="w-full bg-ocean-950 h-1.5 rounded-full overflow-hidden">
+                                        <div id="confidence-bar" class="bg-cyanNeon h-full transition-all duration-1000" style="width: 94.2%"></div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Calculated Surface Footprint -->
+                            <div class="glass-card p-4 rounded-xl border-l-4 border-l-amberNeon flex flex-col justify-between">
+                                <span class="text-xs text-slate-400">Estimated Extent</span>
+                                <div>
+                                    <div id="res-area" class="text-xl font-bold font-mono text-amberNeon">18.65 km²</div>
+                                    <span id="res-pixels" class="text-[10px] text-slate-400">186,500 active pixels</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Backscatter Signature Chart -->
+                        <div class="glass-card p-4 rounded-xl space-y-2">
+                            <div class="flex justify-between items-center text-xs">
+                                <span class="font-semibold text-slate-300">Backscatter Intensity Signature Profile ($\sigma^0$ in dB)</span>
+                                <span class="text-slate-500 font-mono">VV Polarization Profile</span>
+                            </div>
+                            <div class="h-36">
+                                <canvas id="backscatterChart"></canvas>
+                            </div>
+                        </div>
+                    </div>
+
+                </div>
+            </div>
+        </div>
+
+        <!-- TAB 2: HYDRODYNAMIC DISPERSION FORECAST MODEL -->
+        <div id="view-forecast" class="tab-content hidden space-y-6">
+            <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+                
+                <!-- METEOROLOGICAL & OCEAN CURRENT CONTROLS (4 cols) -->
+                <div class="lg:col-span-4 space-y-6">
+                    <div class="glass-panel p-5 rounded-2xl space-y-5">
+                        <h3 class="text-sm font-bold text-white flex items-center gap-2">
+                            <i class="fa-solid fa-compass text-cyanNeon"></i>
+                            Metocean Environmental Parameters
+                        </h3>
+
+                        <!-- Wind Speed & Bearing Controls -->
+                        <div class="space-y-3 glass-card p-3.5 rounded-xl">
+                            <div class="flex justify-between items-center">
+                                <span class="text-xs font-medium text-slate-300 flex items-center gap-2">
+                                    <i class="fa-solid fa-wind text-cyanNeon"></i> Surface Wind Vector
+                                </span>
+                                <span id="wind-speed-val" class="font-mono text-xs text-cyanNeon">14 knots</span>
+                            </div>
+                            <input type="range" id="slider-wind-speed" min="0" max="40" value="14" oninput="updateDispersionParams()" class="w-full">
+                            
+                            <div class="flex justify-between items-center pt-2">
+                                <span class="text-xs text-slate-400">Wind Direction (Bearing)</span>
+                                <span id="wind-dir-val" class="font-mono text-xs text-cyanNeon">135° (SE)</span>
+                            </div>
+                            <input type="range" id="slider-wind-dir" min="0" max="360" value="135" oninput="updateDispersionParams()" class="w-full">
+                        </div>
+
+                        <!-- Ocean Current Vector Controls -->
+                        <div class="space-y-3 glass-card p-3.5 rounded-xl">
+                            <div class="flex justify-between items-center">
+                                <span class="text-xs font-medium text-slate-300 flex items-center gap-2">
+                                    <i class="fa-solid fa-water text-emeraldNeon"></i> Surface Ocean Current
+                                </span>
+                                <span id="current-speed-val" class="font-mono text-xs text-emeraldNeon">1.8 knots</span>
+                            </div>
+                            <input type="range" id="slider-current-speed" min="0" max="5" step="0.1" value="1.8" oninput="updateDispersionParams()" class="w-full">
+                            
+                            <div class="flex justify-between items-center pt-2">
+                                <span class="text-xs text-slate-400">Current Vector Direction</span>
+                                <span id="current-dir-val" class="font-mono text-xs text-emeraldNeon">90° (E)</span>
+                            </div>
+                            <input type="range" id="slider-current-dir" min="0" max="360" value="90" oninput="updateDispersionParams()" class="w-full">
+                        </div>
+
+                        <!-- Drift Coefficient Settings -->
+                        <div class="glass-card p-3.5 rounded-xl space-y-2 text-xs">
+                            <span class="font-semibold text-slate-300">Hydrodynamic Drift Equation Settings</span>
+                            <div class="text-[11px] font-mono text-slate-400 bg-ocean-950 p-2 rounded border border-white/5">
+                                $V_{drift} = \alpha \cdot V_{wind} + \beta \cdot V_{current}$
+                            </div>
+                            <div class="grid grid-cols-2 gap-2 text-[11px] pt-1">
+                                <div><span class="text-slate-500">Windage ($\alpha$):</span> <span class="text-cyanNeon font-mono">0.035</span></div>
+                                <div><span class="text-slate-500">Current ($\beta$):</span> <span class="text-emeraldNeon font-mono">1.00</span></div>
+                            </div>
+                        </div>
+
+                        <!-- Simulation Playback Controls -->
+                        <div class="space-y-3 pt-2">
+                            <div class="flex justify-between text-xs font-mono">
+                                <span class="text-slate-400">Simulation Time Step:</span>
+                                <span id="sim-time-display" class="text-cyanNeon font-bold">T + 12 Hours</span>
+                            </div>
+                            <input type="range" id="slider-sim-time" min="0" max="48" value="12" step="1" oninput="setSimTime(this.value)" class="w-full">
+                            
+                            <div class="flex gap-2">
+                                <button onclick="toggleSimPlay()" id="btn-play-sim" class="flex-1 py-2 rounded-lg bg-cyanNeon text-ocean-950 font-bold text-xs flex items-center justify-center gap-2 hover:bg-cyan-300 transition">
+                                    <i class="fa-solid fa-play" id="sim-play-icon"></i>
+                                    <span id="sim-play-text">Play Forecast</span>
+                                </button>
+                                <button onclick="resetSim()" class="px-3 py-2 rounded-lg bg-ocean-800 text-slate-300 text-xs hover:text-white transition">
+                                    <i class="fa-solid fa-rotate-left"></i>
+                                </button>
+                            </div>
+                        </div>
+
+                    </div>
+                </div>
+
+                <!-- DISPERSION CANVAS & TRAJECTORY METRICS (8 cols) -->
+                <div class="lg:col-span-8 space-y-6">
+                    <div class="glass-panel p-5 rounded-2xl space-y-4">
+                        <div class="flex flex-wrap items-center justify-between gap-2 border-b border-white/5 pb-3">
+                            <div>
+                                <h3 class="text-sm font-bold text-white">Dynamic Plume Dispersion & Drift Forecast Canvas</h3>
+                                <p class="text-xs text-slate-400">Advection-diffusion trajectory model over 48 hours</p>
+                            </div>
+                            <div class="flex items-center gap-3 text-xs font-mono">
+                                <span class="text-slate-400">Particle Count: <span class="text-cyanNeon">1,200</span></span>
+                                <span class="text-slate-400">Scale: <span class="text-slate-200">1px = 100m</span></span>
+                            </div>
+                        </div>
+
+                        <!-- Interactive Simulation Canvas -->
+                        <div class="relative rounded-xl overflow-hidden bg-ocean-950 border border-slate-800 h-[400px]" id="dispersion-container">
+                            <canvas id="dispersion-canvas" class="w-full h-full block cursor-crosshair"></canvas>
+                            
+                            <!-- Overlay Compass Rose -->
+                            <div class="absolute top-4 right-4 w-16 h-16 rounded-full compass-dial flex items-center justify-center pointer-events-none shadow-lg">
+                                <div id="compass-arrow" class="w-1 h-10 bg-gradient-to-t from-emeraldNeon to-cyanNeon rounded transform transition-transform duration-300" style="transform: rotate(135deg);"></div>
+                                <span class="absolute top-1 text-[8px] font-mono text-slate-400 font-bold">N</span>
+                            </div>
+
+                            <!-- Live Scale Indicator -->
+                            <div class="absolute bottom-4 left-4 glass-card px-3 py-1.5 rounded text-[10px] font-mono text-slate-300 flex items-center gap-2 border border-white/10">
+                                <div class="w-12 h-1 bg-cyanNeon"></div>
+                                <span>5 Nautical Miles</span>
+                            </div>
+                        </div>
+
+                        <!-- TRAJECTORY & IMPACT SUMMARY CARDS -->
+                        <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 pt-2">
+                            <div class="glass-card p-3.5 rounded-xl space-y-1">
+                                <span class="text-[11px] text-slate-400">Combined Drift Speed</span>
+                                <div id="metric-drift-speed" class="text-lg font-bold font-mono text-cyanNeon">2.15 knots</div>
+                                <span class="text-[10px] text-slate-500">Vector Heading: 112° ESE</span>
+                            </div>
+
+                            <div class="glass-card p-3.5 rounded-xl space-y-1">
+                                <span class="text-[11px] text-slate-400">Projected Area Spread (48h)</span>
+                                <div id="metric-spread-area" class="text-lg font-bold font-mono text-amberNeon">64.2 km²</div>
+                                <span class="text-[10px] text-slate-500">Diffusion Expansion Rate +220%</span>
+                            </div>
+
+                            <div class="glass-card p-3.5 rounded-xl space-y-1">
+                                <span class="text-[11px] text-slate-400">Estimated Coastal Landfall</span>
+                                <div id="metric-landfall" class="text-lg font-bold font-mono text-crimsonNeon">34 Hours</div>
+                                <span class="text-[10px] text-slate-500">Target Coast: Sector 7 North</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+
+        <!-- TAB 3: ANALYTICS & REPORTS -->
+        <div id="view-analytics" class="tab-content hidden space-y-6">
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                
+                <!-- MAP LOCATION VIEWPORT -->
+                <div class="glass-panel p-5 rounded-2xl md:col-span-2 space-y-4">
+                    <div class="flex justify-between items-center border-b border-white/5 pb-3">
+                        <h3 class="text-sm font-bold text-white flex items-center gap-2">
+                            <i class="fa-solid fa-map-location-dot text-cyanNeon"></i>
+                            Geospatial Swath Position & Maritime Zone Map
+                        </h3>
+                        <span class="text-xs font-mono text-slate-400">Coordinates: 24.842° N, 89.215° W</span>
+                    </div>
+
+                    <!-- Simulated Interactive Map Box -->
+                    <div class="relative rounded-xl overflow-hidden bg-ocean-950 border border-slate-800 h-[320px] flex items-center justify-center">
+                        <div class="absolute inset-0 bg-[radial-gradient(#102a52_1px,transparent_1px)] [background-size:16px_16px] opacity-40"></div>
+                        <canvas id="map-canvas" class="w-full h-full"></canvas>
+
+                        <!-- Floating Incident Info Window -->
+                        <div class="absolute top-4 left-4 glass-card p-3 rounded-lg text-xs space-y-1 border border-cyanNeon/30 max-w-xs">
+                            <div class="font-bold text-white">Gulf Incident Alpha-9</div>
+                            <div class="text-[11px] text-slate-300">Zone: Exclusive Economic Zone (EEZ)</div>
+                            <div class="text-[10px] text-amberNeon">Severity Index: Class 3 (Moderate Spill)</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- SEVERITY INDEX & DOWNLOAD PANEL -->
+                <div class="glass-panel p-5 rounded-2xl space-y-5">
+                    <h3 class="text-sm font-bold text-white flex items-center gap-2">
+                        <i class="fa-solid fa-shield-cat text-amberNeon"></i>
+                        Risk Index & Action Center
+                    </h3>
+
+                    <div class="glass-card p-4 rounded-xl border border-amberNeon/30 space-y-3">
+                        <span class="text-xs text-slate-400">Environmental Risk Score</span>
+                        <div class="flex items-baseline gap-2">
+                            <span class="text-3xl font-black font-mono text-amberNeon">7.8</span>
+                            <span class="text-xs text-slate-400">/ 10 (CRITICAL)</span>
+                        </div>
+                        <p class="text-[11px] text-slate-300 leading-relaxed">
+                            High probability of sensitive mangrove habitat exposure within 36 hours based on current metocean vectors.
+                        </p>
+                    </div>
+
+                    <div class="space-y-3 pt-2">
+                        <button onclick="downloadReport()" class="w-full py-3 rounded-xl bg-ocean-800 hover:bg-ocean-700 text-slate-200 border border-cyanNeon/30 font-semibold text-xs flex items-center justify-center gap-2 transition">
+                            <i class="fa-solid fa-file-pdf text-cyanNeon"></i>
+                            <span>Download Incident Assessment PDF</span>
+                        </button>
+                        <button onclick="openEmergencyModal()" class="w-full py-3 rounded-xl bg-crimsonNeon/20 hover:bg-crimsonNeon text-crimsonNeon hover:text-white border border-crimsonNeon/50 font-semibold text-xs flex items-center justify-center gap-2 transition">
+                            <i class="fa-solid fa-paper-plane"></i>
+                            <span>Transmit Alert to Coast Guard</span>
+                        </button>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+
+    </main>
+
+    <!-- FOOTER -->
+    <footer class="glass-panel border-t border-cyanNeon/10 mt-12 py-4 px-4 text-center text-xs text-slate-500">
+        <div class="max-w-7xl mx-auto flex flex-col sm:flex-row justify-between items-center gap-2 font-mono">
+            <div>AquaSentinel Marine Pollution Intelligence System &copy; 2026</div>
+            <div class="flex gap-4">
+                <a href="#" class="hover:text-cyanNeon transition">Radar Docs</a>
+                <a href="#" class="hover:text-cyanNeon transition">Sentinel-1 API</a>
+                <a href="#" class="hover:text-cyanNeon transition">Hydrodynamic Spec</a>
+            </div>
+        </div>
+    </footer>
+
+    <!-- EMERGENCY ALERT MODAL -->
+    <div id="modal-emergency" class="fixed inset-0 z-50 bg-ocean-950/80 backdrop-blur-md hidden flex items-center justify-center p-4">
+        <div class="glass-panel border border-crimsonNeon/50 max-w-md w-full rounded-2xl p-6 space-y-5 shadow-crimson-glow">
+            <div class="flex justify-between items-center">
+                <div class="flex items-center gap-3 text-crimsonNeon font-bold">
+                    <i class="fa-solid fa-triangle-exclamation text-2xl"></i>
+                    <span class="text-base">Emergency Marine Alert</span>
+                </div>
+                <button onclick="closeEmergencyModal()" class="text-slate-400 hover:text-white"><i class="fa-solid fa-xmark text-lg"></i></button>
+            </div>
+            
+            <p class="text-xs text-slate-300 leading-relaxed">
+                You are about to generate and transmit a high-priority incident warning report to regional maritime response units and environmental protection agencies.
+            </p>
+
+            <div class="space-y-3 bg-ocean-950/80 p-3 rounded-xl border border-white/5 text-xs font-mono">
+                <div><span class="text-slate-500">Incident Type:</span> <span class="text-crimsonNeon">Oil Spill Detected</span></div>
+                <div><span class="text-slate-500">Coordinates:</span> <span class="text-slate-200">24.842° N, 89.215° W</span></div>
+                <div><span class="text-slate-500">Area Extent:</span> <span class="text-amberNeon">18.65 km²</span></div>
+            </div>
+
+            <div class="flex gap-3 pt-2">
+                <button onclick="sendAlertSuccess()" class="flex-1 py-2.5 rounded-xl bg-crimsonNeon text-white font-bold text-xs hover:opacity-90 transition">Confirm & Dispatch Alert</button>
+                <button onclick="closeEmergencyModal()" class="px-4 py-2.5 rounded-xl bg-ocean-800 text-slate-300 text-xs hover:text-white transition">Cancel</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- MAIN INTERACTIVE SCRIPT LOGIC -->
+    <script>
+        // Global State
+        const state = {
+            activeTab: 'detector',
+            displayMode: 'sar', // 'sar', 'mask', 'heatmap'
+            isProcessing: false,
+            presetKey: 'gulf_oil',
+            sarImageLoaded: false,
+            maskImageLoaded: false,
+            uploadedSarImg: null,
+            uploadedMaskImg: null,
+            opacity: 0.65,
+            
+            // Metocean Params
+            windSpeed: 14, // knots
+            windDir: 135, // deg
+            currentSpeed: 1.8, // knots
+            currentDir: 90, // deg
+            simTime: 12, // hours
+            isSimPlaying: false,
+            simAnimFrame: null,
+
+            // AI Detection Output Data
+            detection: {
+                type: 'Oil Spill',
+                subtype: 'Heavy Crude / Slick',
+                confidence: 94.2,
+                areaKm2: 18.65,
+                pixels: 186500
+            }
+        };
+
+        // Dispersion Simulation Particles State
+        const NUM_PARTICLES = 400;
+        let particles = [];
+
+        // DOM Elements
+        let sarCanvas, sarCtx;
+        let dispersionCanvas, dispCtx;
+        let mapCanvas, mapCtx;
+        let backscatterChart = null;
+
+        // On Load Initialization
+        window.onload = function() {
+            initCanvases();
+            initBackscatterChart();
+            initDispersionCanvas();
+            loadPreset('gulf_oil');
+            renderMapCanvas();
+            initDropzones();
+            
+            // Window Resize handling
+            window.addEventListener('resize', () => {
+                resizeCanvases();
+                renderCanvasLayers();
+                renderDispersionFrame();
+                renderMapCanvas();
+            });
+        };
+
+        // Initialize Chart.js Backscatter Chart
+        function initBackscatterChart() {
+            const ctx = document.getElementById('backscatterChart');
+            if (!ctx) return;
+
+            backscatterChart = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: ['Pt 1', 'Pt 2', 'Pt 3', 'Pt 4 (Core)', 'Pt 5 (Core)', 'Pt 6', 'Pt 7', 'Pt 8'],
+                    datasets: [{
+                        label: 'Sigma-0 Backscatter (dB)',
+                        data: [-18, -19, -26, -28, -27, -25, -19, -18],
+                        borderColor: '#00f0ff',
+                        backgroundColor: 'rgba(0, 240, 255, 0.1)',
+                        fill: true,
+                        tension: 0.35,
+                        pointRadius: 4,
+                        pointBackgroundColor: '#00f0ff',
+                        pointHoverRadius: 6
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { display: false },
+                        tooltip: {
+                            callbacks: {
+                                label: (context) => ` Backscatter: ${context.raw} dB`
+                            }
+                        }
+                    },
+                    scales: {
+                        x: {
+                            grid: { color: 'rgba(255, 255, 255, 0.05)' },
+                            ticks: { color: '#94a3b8', font: { size: 9, family: 'JetBrains Mono' } }
+                        },
+                        y: {
+                            grid: { color: 'rgba(255, 255, 255, 0.05)' },
+                            ticks: { color: '#94a3b8', font: { size: 9, family: 'JetBrains Mono' } },
+                            title: { display: true, text: 'dB', color: '#64748b', font: { size: 10 } }
+                        }
+                    }
+                }
+            });
+        }
+
+        function updateChartData(newData) {
+            if (backscatterChart) {
+                backscatterChart.data.datasets[0].data = newData;
+                backscatterChart.update();
+            }
+        }
+
+        // Enable Drag and Drop handlers
+        function initDropzones() {
+            const setupZone = (id, type) => {
+                const zone = document.getElementById(id);
+                if (!zone) return;
+
+                ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+                    zone.addEventListener(eventName, (e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                    }, false);
+                });
+
+                ['dragenter', 'dragover'].forEach(eventName => {
+                    zone.addEventListener(eventName, () => zone.classList.add('border-cyanNeon'), false);
+                });
+
+                ['dragleave', 'drop'].forEach(eventName => {
+                    zone.addEventListener(eventName, () => zone.classList.remove('border-cyanNeon'), false);
+                });
+
+                zone.addEventListener('drop', (e) => {
+                    const dt = e.dataTransfer;
+                    const files = dt.files;
+                    if (files && files.length > 0) {
+                        processFile(files[0], type);
+                    }
+                }, false);
+            };
+
+            setupZone('sar-dropzone', 'sar');
+            setupZone('mask-dropzone', 'mask');
+        }
+
+        // Initialize Canvas References
+        function initCanvases() {
+            sarCanvas = document.getElementById('sar-canvas');
+            sarCtx = sarCanvas.getContext('2d');
+            
+            dispersionCanvas = document.getElementById('dispersion-canvas');
+            dispCtx = dispersionCanvas.getContext('2d');
+
+            mapCanvas = document.getElementById('map-canvas');
+            mapCtx = mapCanvas.getContext('2d');
+
+            resizeCanvases();
+
+            // Hover inspector on SAR Canvas
+            sarCanvas.addEventListener('mousemove', (e) => {
+                const rect = sarCanvas.getBoundingClientRect();
+                const x = Math.floor(e.clientX - rect.left);
+                const y = Math.floor(e.clientY - rect.top);
+                const inspector = document.getElementById('pixel-inspector');
+                
+                if (x >= 0 && x < sarCanvas.width && y >= 0 && y < sarCanvas.height) {
+                    inspector.classList.remove('hidden');
+                    document.getElementById('inspect-coord').innerText = `X:${x}, Y:${y}`;
+                    // Simulated backscatter value calculation based on pixel position
+                    const simulateddB = (-22 + (x % 15) * 0.4 - (y % 10) * 0.2).toFixed(1);
+                    document.getElementById('inspect-val').innerText = `${simulateddB} dB`;
+                } else {
+                    inspector.classList.add('hidden');
+                }
+            });
+
+            sarCanvas.addEventListener('mouseleave', () => {
+                document.getElementById('pixel-inspector').classList.add('hidden');
+            });
+        }
+
+        function initDispersionCanvas() {
+            if (!dispersionCanvas) return;
+            const w = dispersionCanvas.width || 700;
+            const h = dispersionCanvas.height || 400;
+            const centerX = w * 0.35;
+            const centerY = h * 0.5;
+
+            particles = [];
+            for (let i = 0; i < NUM_PARTICLES; i++) {
+                particles.push({
+                    x: centerX + (Math.random() - 0.5) * 35,
+                    y: centerY + (Math.random() - 0.5) * 35,
+                    size: Math.random() * 2.5 + 1
+                });
+            }
+        }
+
+        // --- PRESET DATASETS & SYNTHETIC CANVAS GENERATORS ---
+        const presetData = {
+            gulf_oil: {
+                sensor: 'Sentinel-1 C-Band',
+                res: '10m / px',
+                inc: '34.2°',
+                type: 'Oil Spill',
+                subtype: 'Heavy Crude / Dark Slick Patch',
+                confidence: 94.2,
+                areaKm2: 18.65,
+                pixels: 186500,
+                chartData: [-18, -19, -26, -28, -27, -25, -19, -18]
+            },
+            pacific_debris: {
+                sensor: 'RADARSAT-2 Fine',
+                res: '8m / px',
+                inc: '41.5°',
+                type: 'Marine Plastic / Debris',
+                subtype: 'High Backscatter Rough Anomaly',
+                confidence: 88.7,
+                areaKm2: 7.42,
+                pixels: 74200,
+                chartData: [-18, -17, -11, -8, -10, -12, -17, -18]
+            },
+            clean_coastal: {
+                sensor: 'Sentinel-1 C-Band',
+                res: '10m / px',
+                inc: '28.9°',
+                type: 'Look-alike / Low Wind Slick',
+                subtype: 'Natural Organic Monomolecular Film',
+                confidence: 42.1,
+                areaKm2: 4.10,
+                pixels: 41000,
+                chartData: [-18, -18.5, -20, -21, -21, -20, -18.5, -18]
+            }
+        };
+
+        function loadPreset(key) {
+            state.presetKey = key;
+            const data = presetData[key];
+            
+            document.getElementById('sar-sensor-tag').innerText = data.sensor;
+            document.getElementById('spec-res').innerText = data.res;
+            document.getElementById('spec-inc').innerText = data.inc;
+
+            state.detection = {
+                type: data.type,
+                subtype: data.subtype,
+                confidence: data.confidence,
+                areaKm2: data.areaKm2,
+                pixels: data.pixels
+            };
+
+            updateResultsUI();
+            updateChartData(data.chartData);
+            drawSyntheticSAR(key);
+        }
+
+        // Draw Procedural SAR Texture & Synthetic Mask
+        function drawSyntheticSAR(key) {
+            const w = sarCanvas.width;
+            const h = sarCanvas.height;
+            sarCtx.clearRect(0, 0, w, h);
+
+            // 1. Generate Ocean Speckle Noise Background (SAR VV Intensity)
+            const imgData = sarCtx.createImageData(w, h);
+            const data = imgData.data;
+
+            for (let i = 0; i < data.length; i += 4) {
+                const noise = Math.floor(80 + Math.random() * 40); // Standard ocean roughness
+                data[i] = noise * 0.4;     // R
+                data[i + 1] = noise * 0.7; // G
+                data[i + 2] = noise * 0.9; // B
+                data[i + 3] = 255;         // Alpha
+            }
+            sarCtx.putImageData(imgData, 0, 0);
+
+            // 2. Draw Target Anomaly Shapes based on Preset
+            sarCtx.save();
+            if (key === 'gulf_oil' || key === 'clean_coastal') {
+                // Low backscatter dark patch
+                sarCtx.fillStyle = 'rgba(3, 8, 22, 0.92)';
+                sarCtx.beginPath();
+                sarCtx.ellipse(w / 2, h / 2, w * 0.28, h * 0.2, Math.PI / 6, 0, Math.PI * 2);
+                sarCtx.fill();
+
+                // Secondary dark tendril
+                sarCtx.beginPath();
+                sarCtx.ellipse(w * 0.65, h * 0.6, w * 0.15, h * 0.08, -Math.PI / 8, 0, Math.PI * 2);
+                sarCtx.fill();
+            } else if (key === 'pacific_debris') {
+                // High backscatter bright rough anomaly
+                sarCtx.fillStyle = 'rgba(0, 240, 255, 0.7)';
+                for (let k = 0; k < 12; k++) {
+                    const rx = w / 2 + (Math.random() - 0.5) * 160;
+                    const ry = h / 2 + (Math.random() - 0.5) * 100;
+                    sarCtx.beginPath();
+                    sarCtx.arc(rx, ry, Math.random() * 12 + 4, 0, Math.PI * 2);
+                    sarCtx.fill();
+                }
+            }
+            sarCtx.restore();
+
+            // Render Mask Overlay if toggled
+            renderCanvasLayers();
+        }
+
+        // Render Mask Overlay according to Mode and Opacity
+        function renderCanvasLayers() {
+            if (!sarCtx) return;
+
+            const w = sarCanvas.width;
+            const h = sarCanvas.height;
+            const showMask = document.getElementById('toggle-mask-overlay').checked;
+            const opacity = parseFloat(document.getElementById('mask-opacity').value);
+            document.getElementById('opacity-val').innerText = `${Math.round(opacity * 100)}%`;
+
+            if (state.displayMode === 'mask' || (showMask && state.displayMode === 'sar')) {
+                sarCtx.save();
+                sarCtx.globalAlpha = opacity;
+                
+                // Overlay synthetic binary mask contours
+                if (state.presetKey === 'gulf_oil' || state.presetKey === 'clean_coastal') {
+                    sarCtx.fillStyle = 'rgba(255, 0, 85, 0.5)'; // Reddish spill mask
+                    sarCtx.strokeStyle = '#ff0055';
+                    sarCtx.lineWidth = 2;
+
+                    sarCtx.beginPath();
+                    sarCtx.ellipse(w / 2, h / 2, w * 0.28, h * 0.2, Math.PI / 6, 0, Math.PI * 2);
+                    sarCtx.fill();
+                    sarCtx.stroke();
+
+                    sarCtx.beginPath();
+                    sarCtx.ellipse(w * 0.65, h * 0.6, w * 0.15, h * 0.08, -Math.PI / 8, 0, Math.PI * 2);
+                    sarCtx.fill();
+                    sarCtx.stroke();
+                } else {
+                    sarCtx.fillStyle = 'rgba(255, 183, 0, 0.6)'; // Amber debris mask
+                    sarCtx.strokeStyle = '#ffb700';
+                    sarCtx.lineWidth = 2;
+                    sarCtx.beginPath();
+                    sarCtx.arc(w / 2, h / 2, 70, 0, Math.PI * 2);
+                    sarCtx.fill();
+                    sarCtx.stroke();
+                }
+                sarCtx.restore();
+            } else if (state.displayMode === 'heatmap') {
+                // Render confidence gradient heatmap
+                sarCtx.save();
+                sarCtx.globalAlpha = 0.55;
+                const grad = sarCtx.createRadialGradient(w/2, h/2, 10, w/2, h/2, 160);
+                grad.addColorStop(0, 'rgba(255, 0, 85, 0.9)');
+                grad.addColorStop(0.5, 'rgba(255, 183, 0, 0.6)');
+                grad.addColorStop(1, 'rgba(0, 240, 255, 0)');
+                sarCtx.fillStyle = grad;
+                sarCtx.fillRect(0, 0, w, h);
+                sarCtx.restore();
+            }
+        }
+
+        function setMapDisplayMode(mode) {
+            state.displayMode = mode;
+            ['sar', 'mask', 'heat'].forEach(m => {
+                const btn = document.getElementById(`mode-${m}`);
+                if (m === mode || (m==='heat' && mode==='heatmap')) {
+                    btn.className = "px-2.5 py-1 rounded bg-cyanNeon/20 text-cyanNeon border border-cyanNeon/30 font-mono";
+                } else {
+                    btn.className = "px-2.5 py-1 rounded bg-ocean-800 text-slate-400 font-mono";
+                }
+            });
+            drawSyntheticSAR(state.presetKey);
+        }
+
+        function applyFiltersAndRender() {
+            drawSyntheticSAR(state.presetKey);
+        }
+
+        // Simulate Neural Network Scan Action
+        function runAIAnalysis() {
+            const btn = document.getElementById('btn-analyze');
+            const badge = document.getElementById('processing-badge');
+            const scanner = document.getElementById('radar-scanner');
+
+            btn.disabled = true;
+            btn.classList.add('opacity-50');
+            badge.classList.remove('hidden');
+            scanner.classList.remove('hidden');
+
+            setTimeout(() => {
+                btn.disabled = false;
+                btn.classList.remove('opacity-50');
+                badge.classList.add('hidden');
+                scanner.classList.add('hidden');
+
+                // Slightly tweak results to simulate fresh inference
+                state.detection.confidence = (92 + Math.random() * 6).toFixed(1);
+                updateResultsUI();
+            }, 2200);
+        }
+
+        function updateResultsUI() {
+            document.getElementById('res-classification').innerText = state.detection.type;
+            document.getElementById('res-subtype').innerText = state.detection.subtype;
+            document.getElementById('res-confidence').innerText = `${state.detection.confidence}%`;
+            document.getElementById('confidence-bar').style.width = `${state.detection.confidence}%`;
+            document.getElementById('res-area').innerText = `${state.detection.areaKm2} km²`;
+            document.getElementById('res-pixels').innerText = `${state.detection.pixels.toLocaleString()} active pixels`;
+        }
+
+        function handleFileUpload(event, type) {
+            const file = event.target.files[0];
+            if (file) {
+                processFile(file, type);
+            }
+        }
+
+        function processFile(file, type) {
+            if (!file.type.startsWith('image/')) {
+                const msgBox = document.createElement('div');
+                msgBox.className = 'fixed bottom-6 right-6 z-50 glass-panel border border-crimsonNeon/50 px-4 py-3 rounded-xl text-xs text-crimsonNeon shadow-crimson-glow flex items-center gap-2 font-mono';
+                msgBox.innerHTML = '<i class="fa-solid fa-triangle-exclamation"></i> Please select a valid image file (PNG, JPG, WEBP, etc.).';
+                document.body.appendChild(msgBox);
+                setTimeout(() => msgBox.remove(), 4000);
+                return;
+            }
+
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                const img = new Image();
+                img.onload = function() {
+                    if (type === 'sar') {
+                        state.uploadedSarImg = img;
+                        state.sarImageLoaded = true;
+                        document.getElementById('sar-sensor-tag').innerText = 'User Uploaded Image';
+                    } else if (type === 'mask') {
+                        state.uploadedMaskImg = img;
+                        state.maskImageLoaded = true;
+                    }
+                    renderUploadedImage();
+                };
+                img.src = e.target.result;
+            };
+            reader.readAsDataURL(file);
+        }
+
+        // Handle canvas dimensions responsive sizing
+        function resizeCanvases() {
+            const sarContainer = document.getElementById('canvas-container');
+            if (sarContainer && sarCanvas) {
+                sarCanvas.width = sarContainer.clientWidth || 600;
+                sarCanvas.height = sarContainer.clientHeight || 380;
+            }
+
+            const dispContainer = document.getElementById('dispersion-container');
+            if (dispContainer && dispersionCanvas) {
+                dispersionCanvas.width = dispContainer.clientWidth || 700;
+                dispersionCanvas.height = dispContainer.clientHeight || 400;
+            }
+
+            const mapContainer = mapCanvas ? mapCanvas.parentElement : null;
+            if (mapContainer && mapCanvas) {
+                mapCanvas.width = mapContainer.clientWidth || 600;
+                mapCanvas.height = mapContainer.clientHeight || 320;
+            }
+        }
+
+        function renderUploadedImage() {
+            const w = sarCanvas.width;
+            const h = sarCanvas.height;
+            sarCtx.clearRect(0, 0, w, h);
+
+            if (state.sarImageLoaded && state.uploadedSarImg) {
+                sarCtx.drawImage(state.uploadedSarImg, 0, 0, w, h);
+            } else {
+                drawSyntheticSAR(state.presetKey);
+                return;
+            }
+
+            if (state.maskImageLoaded && state.uploadedMaskImg && document.getElementById('toggle-mask-overlay').checked) {
+                sarCtx.save();
+                sarCtx.globalAlpha = parseFloat(document.getElementById('mask-opacity').value);
+                sarCtx.drawImage(state.uploadedMaskImg, 0, 0, w, h);
+                sarCtx.restore();
+            }
+        }
+
+        // Draw Procedural SAR Texture & Synthetic Mask
+        function drawSyntheticSAR(key) {
+            if (state.sarImageLoaded) {
+                renderUploadedImage();
+                return;
+            }
+
+            const w = sarCanvas.width;
+            const h = sarCanvas.height;
+            sarCtx.clearRect(0, 0, w, h);
+
+            // 1. Generate Ocean Speckle Noise Background (SAR VV Intensity)
+            const imgData = sarCtx.createImageData(w, h);
+            const data = imgData.data;
+
+            for (let i = 0; i < data.length; i += 4) {
+                const noise = Math.floor(80 + Math.random() * 40); // Standard ocean roughness
+                data[i] = noise * 0.4;     // R
+                data[i + 1] = noise * 0.7; // G
+                data[i + 2] = noise * 0.9; // B
+                data[i + 3] = 255;         // Alpha
+            }
+            sarCtx.putImageData(imgData, 0, 0);
+
+            // 2. Draw Target Anomaly Shapes based on Preset
+            sarCtx.save();
+            if (key === 'gulf_oil' || key === 'clean_coastal') {
+                // Low backscatter dark patch
+                sarCtx.fillStyle = 'rgba(3, 8, 22, 0.92)';
+                sarCtx.beginPath();
+                sarCtx.ellipse(w / 2, h / 2, w * 0.28, h * 0.2, Math.PI / 6, 0, Math.PI * 2);
+                sarCtx.fill();
+
+                // Secondary dark tendril
+                sarCtx.beginPath();
+                sarCtx.ellipse(w * 0.65, h * 0.6, w * 0.15, h * 0.08, -Math.PI / 8, 0, Math.PI * 2);
+                sarCtx.fill();
+            } else if (key === 'pacific_debris') {
+                // High backscatter bright rough anomaly
+                sarCtx.fillStyle = 'rgba(0, 240, 255, 0.7)';
+                for (let k = 0; k < 12; k++) {
+                    const rx = w / 2 + (Math.random() - 0.5) * 160;
+                    const ry = h / 2 + (Math.random() - 0.5) * 100;
+                    sarCtx.beginPath();
+                    sarCtx.arc(rx, ry, Math.random() * 12 + 4, 0, Math.PI * 2);
+                    sarCtx.fill();
+                }
+            }
+            sarCtx.restore();
+
+            // Render Mask Overlay if toggled
+            renderCanvasLayers();
+        }
+
+        function updateDispersionParams() {
+            state.windSpeed = parseFloat(document.getElementById('slider-wind-speed').value);
+            state.windDir = parseFloat(document.getElementById('slider-wind-dir').value);
+            state.currentSpeed = parseFloat(document.getElementById('slider-current-speed').value);
+            state.currentDir = parseFloat(document.getElementById('slider-current-dir').value);
+
+            document.getElementById('wind-speed-val').innerText = `${state.windSpeed} knots`;
+            document.getElementById('wind-dir-val').innerText = `${state.windDir}°`;
+            document.getElementById('current-speed-val').innerText = `${state.currentSpeed} knots`;
+            document.getElementById('current-dir-val').innerText = `${state.currentDir}°`;
+
+            // Update Compass Needle Direction
+            document.getElementById('compass-arrow').style.transform = `rotate(${state.windDir}deg)`;
+
+            // Recalculate Trajectory Velocity Metrics
+            const windageCoeff = 0.035;
+            const totalDriftSpeed = (state.windSpeed * windageCoeff + state.currentSpeed).toFixed(2);
+            document.getElementById('metric-drift-speed').innerText = `${totalDriftSpeed} knots`;
+
+            const projectedArea = (18.65 + (state.simTime * totalDriftSpeed * 0.25)).toFixed(1);
+            document.getElementById('metric-spread-area').innerText = `${projectedArea} km²`;
+
+            renderDispersionFrame();
+        }
+
+        function setSimTime(val) {
+            state.simTime = parseInt(val);
+            document.getElementById('sim-time-display').innerText = `T + ${state.simTime} Hours`;
+            updateDispersionParams();
+        }
+
+        function renderDispersionFrame() {
+            if (!dispCtx) return;
+
+            const w = dispersionCanvas.width;
+            const h = dispersionCanvas.height;
+            dispCtx.clearRect(0, 0, w, h);
+
+            // Draw Background Hydrodynamic Grid
+            dispCtx.strokeStyle = 'rgba(0, 240, 255, 0.05)';
+            dispCtx.lineWidth = 1;
+            const gridSize = 30;
+            for (let x = 0; x < w; x += gridSize) {
+                dispCtx.beginPath(); dispCtx.moveTo(x, 0); dispCtx.lineTo(x, h); dispCtx.stroke();
+            }
+            for (let y = 0; y < h; y += gridSize) {
+                dispCtx.beginPath(); dispCtx.moveTo(0, y); dispCtx.lineTo(w, y); dispCtx.stroke();
+            }
+
+            // Calculate Drift Vectors
+            const windRad = (state.windDir * Math.PI) / 180;
+            const currRad = (state.currentDir * Math.PI) / 180;
+
+            const windVx = Math.sin(windRad) * state.windSpeed * 0.035;
+            const windVy = -Math.cos(windRad) * state.windSpeed * 0.035;
+
+            const currVx = Math.sin(currRad) * state.currentSpeed * 0.8;
+            const currVy = -Math.cos(currRad) * state.currentSpeed * 0.8;
+
+            const totalVx = windVx + currVx;
+            const totalVy = windVy + currVy;
+
+            // Render Coastline Hazard Boundary
+            dispCtx.fillStyle = 'rgba(16, 42, 82, 0.7)';
+            dispCtx.strokeStyle = 'rgba(255, 0, 85, 0.4)';
+            dispCtx.beginPath();
+            dispCtx.moveTo(w * 0.85, 0);
+            dispCtx.quadraticCurveTo(w * 0.75, h * 0.5, w * 0.9, h);
+            dispCtx.lineTo(w, h);
+            dispCtx.lineTo(w, 0);
+            dispCtx.closePath();
+            dispCtx.fill();
+            dispCtx.stroke();
+
+            // Label Coastline
+            dispCtx.fillStyle = '#ff0055';
+            dispCtx.font = '10px JetBrains Mono';
+            dispCtx.fillText('PROTECTED COASTAL ZONE 7', w * 0.82, 25);
+
+            // Origin Release Marker
+            const originX = w * 0.35;
+            const originY = h * 0.5;
+            dispCtx.fillStyle = '#00f0ff';
+            dispCtx.beginPath();
+            dispCtx.arc(originX, originY, 4, 0, Math.PI * 2);
+            dispCtx.fill();
+            dispCtx.fillText('Release Point T=0', originX - 35, originY - 10);
+
+            // Render Drift Particles
+            const timeStep = state.simTime;
+            dispCtx.fillStyle = 'rgba(255, 0, 85, 0.65)';
+
+            particles.forEach((p, index) => {
+                // Advection + Random Brownian Diffusion Expansion
+                const noiseX = (Math.sin(index + timeStep) * 0.8) * timeStep;
+                const noiseY = (Math.cos(index + timeStep) * 0.8) * timeStep;
+
+                const curX = originX + (totalVx * timeStep * 8) + noiseX + (p.x - originX) * (1 + timeStep * 0.02);
+                const curY = originY + (totalVy * timeStep * 8) + noiseY + (p.y - originY) * (1 + timeStep * 0.02);
+
+                dispCtx.beginPath();
+                dispCtx.arc(curX, curY, p.size, 0, Math.PI * 2);
+                dispCtx.fill();
+            });
+
+            // Draw Dynamic Vector Arrow
+            dispCtx.save();
+            dispCtx.strokeStyle = '#00ff9d';
+            dispCtx.lineWidth = 2;
+            dispCtx.beginPath();
+            dispCtx.moveTo(originX, originY);
+            dispCtx.lineTo(originX + totalVx * 35, originY + totalVy * 35);
+            dispCtx.stroke();
+            dispCtx.restore();
+        }
+
+        function toggleSimPlay() {
+            state.isSimPlaying = !state.isSimPlaying;
+            const icon = document.getElementById('sim-play-icon');
+            const text = document.getElementById('sim-play-text');
+
+            if (state.isSimPlaying) {
+                icon.className = 'fa-solid fa-pause';
+                text.innerText = 'Pause Forecast';
+                animateSim();
+            } else {
+                icon.className = 'fa-solid fa-play';
+                text.innerText = 'Play Forecast';
+                cancelAnimationFrame(state.simAnimFrame);
+            }
+        }
+
+        function animateSim() {
+            if (!state.isSimPlaying) return;
+            let currentTime = parseInt(document.getElementById('slider-sim-time').value);
+            currentTime = (currentTime + 1) % 49;
+            document.getElementById('slider-sim-time').value = currentTime;
+            setSimTime(currentTime);
+
+            setTimeout(() => {
+                state.simAnimFrame = requestAnimationFrame(animateSim);
+            }, 300);
+        }
+
+        function resetSim() {
+            state.isSimPlaying = false;
+            cancelAnimationFrame(state.simAnimFrame);
+            document.getElementById('sim-play-icon').className = 'fa-solid fa-play';
+            document.getElementById('sim-play-text').innerText = 'Play Forecast';
+            document.getElementById('slider-sim-time').value = 0;
+            setSimTime(0);
+        }
+
+        // --- GEOSPATIAL MAP CANVAS ---
+        function renderMapCanvas() {
+            if (!mapCtx) return;
+            const w = mapCanvas.width;
+            const h = mapCanvas.height;
+            mapCtx.clearRect(0, 0, w, h);
+
+            // Draw Coastal Landmass Outline
+            mapCtx.fillStyle = '#071126';
+            mapCtx.fillRect(0, 0, w, h);
+
+            mapCtx.fillStyle = '#102a52';
+            mapCtx.beginPath();
+            mapCtx.arc(w * 0.1, h * 0.2, 140, 0, Math.PI * 2);
+            mapCtx.arc(w * 0.3, h * 0.9, 180, 0, Math.PI * 2);
+            mapCtx.fill();
+
+            // Draw Target Detection Quadrant Box
+            mapCtx.strokeStyle = '#00f0ff';
+            mapCtx.lineWidth = 2;
+            mapCtx.strokeRect(w * 0.45, h * 0.35, 80, 60);
+
+            mapCtx.fillStyle = 'rgba(255, 0, 85, 0.4)';
+            mapCtx.fillRect(w * 0.45, h * 0.35, 80, 60);
+
+            mapCtx.fillStyle = '#00f0ff';
+            mapCtx.font = '10px JetBrains Mono';
+            mapCtx.fillText('SWATH #8912', w * 0.45, h * 0.35 - 6);
+        }
+
+        // --- MODAL & ACTION HANDLERS ---
+        function openEmergencyModal() {
+            document.getElementById('modal-emergency').classList.remove('hidden');
+        }
+
+        function closeEmergencyModal() {
+            document.getElementById('modal-emergency').classList.add('hidden');
+        }
+
+        function sendAlertSuccess() {
+            closeEmergencyModal();
+            const msgBox = document.createElement('div');
+            msgBox.className = 'fixed bottom-6 right-6 z-50 glass-panel border border-emeraldNeon/50 px-4 py-3 rounded-xl text-xs text-emeraldNeon shadow-emerald-glow flex items-center gap-2 font-mono';
+            msgBox.innerHTML = '<i class="fa-solid fa-circle-check"></i> Emergency alert transmitted to Maritime Emergency Operations Center.';
+            document.body.appendChild(msgBox);
+            setTimeout(() => msgBox.remove(), 4000);
+        }
+
+        function downloadReport() {
+            const reportContent = `
+=====================================================
+AQUASENTINEL MARINE POLLUTION INCIDENT REPORT
+=====================================================
+Generated: ${new Date().toISOString()}
+Sensor Platform: ${presetData[state.presetKey].sensor}
+Coordinates: 24.842 N, 89.215 W
+
+CLASSIFICATION RESULTS:
+- Feature Type: ${state.detection.type}
+- Classification Subtype: ${state.detection.subtype}
+- Detection Confidence: ${state.detection.confidence}%
+- Surface Area Extent: ${state.detection.areaKm2} sq km
+
+METOCEAN DISPERSION PREDICTION:
+- Surface Wind: ${state.windSpeed} knots (${state.windDir} deg)
+- Surface Ocean Current: ${state.currentSpeed} knots (${state.currentDir} deg)
+- Projected Coastal Exposure: 34 Hours
+=====================================================
+            `;
+
+            const blob = new Blob([reportContent], { type: 'text/plain' });
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `AquaSentinel_Incident_Report_${Date.now()}.txt`;
+            a.click();
+            window.URL.revokeObjectURL(url);
+        }
+    </script>
+</body>
+</html>
